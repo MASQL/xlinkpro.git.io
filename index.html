@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X-Link Pro v2 | Snapshot & Flash</title>
+    <style>
+        :root { 
+            --primary: #00ff88; 
+            --bg: #0a0a0a; 
+            --card: #141414;
+            --accent: #ff0055;
+        }
+        
+        body { 
+            font-family: 'Segoe UI', Roboto, sans-serif; 
+            background: var(--bg); 
+            color: white; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+            margin: 0; 
+        }
+
+        .container { 
+            text-align: center; 
+            width: 95%; 
+            max-width: 500px; 
+            padding: 30px; 
+            border: 1px solid #222; 
+            border-radius: 28px; 
+            background: var(--card); 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.9); 
+        }
+
+        /* VIDEO STYLING */
+        .video-container { position: relative; margin-top: 20px; }
+        
+        video { 
+            width: 100%; 
+            border-radius: 18px; 
+            background: #000;
+            border: 1px solid #333;
+            transform: scaleX(-1); 
+            filter: contrast(1.05) brightness(1.1) saturate(1.1);
+        }
+
+        /* TOOLBAR MONITOR */
+        .toolbar {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        h1 { font-size: 24px; letter-spacing: -1px; margin-bottom: 5px; }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: bold;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+
+        .btn-group { display: grid; gap: 12px; }
+
+        button { 
+            padding: 15px; 
+            border-radius: 12px; 
+            border: none; 
+            font-weight: 700; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .btn-monitor { background: var(--primary); color: black; }
+        .btn-join { background: #222; color: white; }
+        .btn-action { background: #333; color: white; flex: 1; }
+        .btn-action:hover { background: #444; }
+        .btn-snap { background: var(--accent); color: white; }
+
+        input { 
+            width: 100%; 
+            padding: 15px; 
+            margin-bottom: 20px; 
+            border-radius: 10px; 
+            border: 1px solid #333; 
+            background: #000; 
+            color: var(--primary); 
+            text-align: center; 
+            font-size: 18px;
+            box-sizing: border-box;
+        }
+
+        .hidden { display: none; }
+        #myIdDisplay { font-family: monospace; font-size: 20px; color: var(--primary); }
+        canvas { display: none; } /* Untuk proses snapshot */
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="page-home">
+        <h1>X-LINK <span style="color:var(--primary)">PRO V2</span></h1>
+        <p style="color:#666; font-size: 14px; margin-bottom: 30px;">HD Monitoring & Remote Control</p>
+        <div class="btn-group">
+            <button class="btn-monitor" onclick="openMonitor()">MODE MONITOR (LAPTOP)</button>
+            <button class="btn-join" onclick="openJoin()">MODE JOIN (HP)</button>
+        </div>
+    </div>
+
+    <div id="ui-monitor" class="hidden">
+        <div class="status-badge">RECEIVER MODE</div>
+        <p style="color: #666; font-size: 12px;">ID MONITOR: <span id="myIdDisplay">...</span></p>
+        
+        <div class="video-container">
+            <video id="remoteVideo" autoplay playsinline></video>
+        </div>
+
+        <div class="toolbar">
+            <button class="btn-action btn-snap" onclick="takeSnapshot()">📸 SNAPSHOT</button>
+            <button class="btn-action" onclick="toggleRemoteFlash()">💡 TOGGLE FLASH</button>
+        </div>
+        <p id="monitor-msg" style="font-size: 11px; color: #555; margin-top: 10px;">Snapshot otomatis tersimpan di laptop.</p>
+    </div>
+
+    <div id="ui-join" class="hidden">
+        <div class="status-badge">SENDER MODE</div>
+        <input type="text" id="targetIdInput" placeholder="MASUKKAN ID MONITOR">
+        <button class="btn-monitor" style="width: 100%;" onclick="startHDStream()">HUBUNGKAN & STREAM</button>
+        <p id="status-text" style="color:#666; font-size: 12px; margin-top: 15px;">Siap mengirim video...</p>
+    </div>
+</div>
+
+<canvas id="snapshotCanvas"></canvas>
+
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script>
+    const peer = new Peer();
+    let currentCall;
+    let localStream;
+
+    peer.on('open', (id) => {
+        document.getElementById('myIdDisplay').innerText = id;
+    });
+
+    function openMonitor() {
+        document.getElementById('page-home').classList.add('hidden');
+        document.getElementById('ui-monitor').classList.remove('hidden');
+
+        peer.on('call', (call) => {
+            currentCall = call;
+            call.answer();
+            call.on('stream', (stream) => {
+                document.getElementById('remoteVideo').srcObject = stream;
+            });
+        });
+    }
+
+    function openJoin() {
+        document.getElementById('page-home').classList.add('hidden');
+        document.getElementById('ui-join').classList.remove('hidden');
+    }
+
+    async function startHDStream() {
+        const targetId = document.getElementById('targetIdInput').value;
+        if (!targetId) return alert("Isi ID Monitor!");
+
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 1920, height: 1080, facingMode: "user" },
+                audio: false
+            });
+            peer.call(targetId, localStream);
+            document.getElementById('status-text').innerText = "Streaming Berjalan!";
+            document.getElementById('status-text').style.color = "#00ff88";
+        } catch (err) {
+            alert("Akses kamera ditolak!");
+        }
+    }
+
+    // FITUR 1: SNAPSHOT
+    function takeSnapshot() {
+        const video = document.getElementById('remoteVideo');
+        const canvas = document.getElementById('snapshotCanvas');
+        const context = canvas.getContext('2d');
+
+        if (video.videoWidth > 0) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // Gambar frame video ke canvas
+            context.scale(-1, 1); // Mirror balik biar fotonya normal
+            context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+
+            // Download file
+            const link = document.createElement('a');
+            link.download = `XLink-Snap-${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        } else {
+            alert("Video belum muncul!");
+        }
+    }
+
+    // FITUR 2: REMOTE FLASH (LOGIC)
+    // Karena ini P2P, kita kirim "pesan" lewat koneksi data jika ingin kontrol jarak jauh.
+    // Tapi untuk versi simpel ini, senter biasanya dikontrol di sisi pengirim.
+    // Kita simulasi fungsi toggle jika HP mendukung torch.
+    async function toggleRemoteFlash() {
+        if (!localStream) {
+            alert("Hanya bisa dilakukan dari sisi HP atau butuh Data Connection aktif.");
+            return;
+        }
+        const track = localStream.getVideoTracks()[0];
+        const caps = track.getCapabilities();
+        if (caps.torch) {
+            const currentTorch = track.getSettings().torch;
+            await track.applyConstraints({
+                advanced: [{ torch: !currentTorch }]
+            });
+        } else {
+            alert("Senter tidak didukung di perangkat ini/kamera depan.");
+        }
+    }
+</script>
+</body>
+</html>
