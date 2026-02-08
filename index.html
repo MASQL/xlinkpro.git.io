@@ -3,30 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>X-Link Pro v6 | Ultimate Streamer</title>
+    <title>X-Link Pro v7 | Video Call Edition</title>
     <style>
         :root { --primary: #00ff88; --bg: #0a0a0a; --card: #111; --gray: #222; }
         * { box-sizing: border-box; transition: all 0.2s ease; }
-        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: white; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: white; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; overflow: hidden; }
         
-        .container { text-align: center; width: 95%; max-width: 480px; padding: 25px; border-radius: 32px; background: var(--card); border: 1px solid #333; box-shadow: 0 30px 60px rgba(0,0,0,0.8); }
+        .container { text-align: center; width: 95%; max-width: 480px; padding: 25px; border-radius: 32px; background: var(--card); border: 1px solid #333; box-shadow: 0 30px 60px rgba(0,0,0,0.8); position: relative; }
         
-        /* Video Display */
+        /* Viewport Styling */
         .viewport { position: relative; width: 100%; aspect-ratio: 9/16; border-radius: 24px; overflow: hidden; background: #000; border: 1px solid #333; margin: 20px 0; }
-        video { width: 100%; height: 100%; object-fit: cover; filter: contrast(1.05) brightness(1.1); }
+        video { width: 100%; height: 100%; object-fit: cover; }
         .mirrored { transform: scaleX(-1); }
+
+        /* Mini Preview (PIP) */
+        .pip-video { position: absolute; bottom: 15px; right: 15px; width: 30%; aspect-ratio: 9/16; border-radius: 12px; border: 2px solid var(--primary); background: #000; z-index: 10; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
 
         /* Modern Controls */
         .control-panel { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px; }
-        button { padding: 18px; border-radius: 16px; border: none; font-weight: 700; cursor: pointer; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        button { padding: 18px; border-radius: 16px; border: none; font-weight: 700; cursor: pointer; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: center; gap: 8px; }
         
         .btn-glow { background: var(--primary); color: black; box-shadow: 0 0 15px rgba(0,255,136,0.3); }
         .btn-dark { background: var(--gray); color: white; border: 1px solid #444; }
         .btn-dark:hover { background: #333; border-color: var(--primary); }
         .btn-full { grid-column: span 2; }
         
-        input { width: 100%; padding: 18px; border-radius: 14px; border: 1px solid #333; background: #050505; color: var(--primary); text-align: center; font-size: 18px; margin-bottom: 20px; font-family: monospace; }
-        .badge { font-size: 10px; color: var(--primary); background: rgba(0,255,136,0.1); padding: 6px 14px; border-radius: 20px; border: 1px solid var(--primary); display: inline-block; margin-bottom: 15px; }
+        input { width: 100%; padding: 18px; border-radius: 14px; border: 1px solid #333; background: #050505; color: var(--primary); text-align: center; font-size: 18px; margin-bottom: 20px; font-family: monospace; outline: none; }
+        .badge { font-size: 10px; color: var(--primary); background: rgba(0,255,136,0.1); padding: 6px 14px; border-radius: 20px; border: 1px solid var(--primary); display: inline-block; margin-bottom: 15px; font-weight: bold; }
         .hidden { display: none; }
         canvas { display: none; }
     </style>
@@ -35,8 +38,8 @@
 
 <div class="container">
     <div id="page-home">
-        <h1 style="letter-spacing:-1px">X-LINK <span style="color:var(--primary)">PRO</span></h1>
-        <p style="color:#666; font-size:13px; margin-top:-10px">Secure Remote P2P Camera</p>
+        <h1 style="letter-spacing:-1px">X-LINK <span style="color:var(--primary)">PRO v7</span></h1>
+        <p style="color:#666; font-size:13px; margin-top:-10px">Bidirectional P2P Video Call</p>
         <div style="display:grid; gap:12px; margin-top:40px">
             <button class="btn-glow btn-full" onclick="nav('ui-monitor'); setupMonitor()">MODE MONITOR (LAPTOP)</button>
             <button class="btn-dark btn-full" onclick="nav('ui-join')">MODE JOIN (HP)</button>
@@ -44,31 +47,35 @@
     </div>
 
     <div id="ui-monitor" class="hidden">
-        <div class="badge">RECEIVER: <span id="myId">...</span></div>
+        <div class="badge">MY ID: <span id="myId">...</span></div>
         <div class="viewport">
-            <video id="remoteVideo" autoplay playsinline></video>
+            <video id="remoteVideoMonitor" autoplay playsinline></video>
+            <video id="localVideoMonitor" class="pip-video mirrored" autoplay playsinline muted></video>
         </div>
         <div class="control-panel">
-            <button class="btn-glow btn-full" onclick="takeSnapshot()">📸 TAKE SNAPSHOT</button>
-            <button class="btn-dark btn-full" onclick="sendCmd('TOGGLE_FLASH')">💡 REMOTE FLASH</button>
+            <button class="btn-glow btn-full" onclick="takeSnapshot('remoteVideoMonitor')">📸 SNAPSHOT</button>
+            <button class="btn-dark btn-full" onclick="sendCmd('TOGGLE_FLASH')">🔦 REMOTE FLASH</button>
+            <button class="btn-dark btn-full" style="color:#ff4444" onclick="location.reload()">🛑 END CALL</button>
         </div>
     </div>
 
     <div id="ui-join" class="hidden">
         <div id="setup-join">
             <div class="badge">SENDER READY</div>
-            <input type="text" id="targetId" placeholder="ID MONITOR">
-            <button class="btn-glow btn-full" onclick="startStream()">START STREAMING</button>
+            <input type="text" id="targetId" placeholder="ENTER MONITOR ID">
+            <button class="btn-glow btn-full" onclick="startStream()">START VIDEO CALL</button>
+            <button class="btn-dark btn-full" style="margin-top:10px" onclick="location.reload()">BACK</button>
         </div>
 
         <div id="active-join" class="hidden">
-            <div class="badge" id="camStatus">ACTIVE: FRONT CAM</div>
+            <div class="badge" id="camStatus">LIVE: FRONT CAM</div>
             <div class="viewport">
-                <video id="localVideo" autoplay playsinline muted class="mirrored"></video>
+                <video id="remoteVideoJoin" autoplay playsinline></video>
+                <video id="localVideoJoin" class="pip-video mirrored" autoplay playsinline muted></video>
             </div>
             <div class="control-panel">
                 <button class="btn-dark" onclick="switchCam()">🔄 SWITCH</button>
-                <button class="btn-dark" onclick="localToggleFlash()">💡 FLASH</button>
+                <button class="btn-dark" onclick="localToggleFlash()">🔦 FLASH</button>
                 <button class="btn-dark btn-full" style="color:#ff4444" onclick="location.reload()">🛑 STOP</button>
             </div>
         </div>
@@ -82,79 +89,109 @@
     const peer = new Peer();
     let dataConn, localStream, isFlash = false, facing = "user";
 
-    peer.on('open', id => document.getElementById('myId').innerText = id);
+    peer.on('open', id => {
+        document.getElementById('myId').innerText = id;
+    });
 
     function nav(id) {
         document.querySelectorAll('.container > div').forEach(d => d.classList.add('hidden'));
         document.getElementById(id).classList.remove('hidden');
     }
 
-    // MONITOR
-    function setupMonitor() {
-        peer.on('connection', conn => { dataConn = conn; });
-        peer.on('call', call => {
-            call.answer();
-            call.on('stream', s => document.getElementById('remoteVideo').srcObject = s);
-        });
+    // --- LOGIKA MONITOR (LAPTOP) ---
+    async function setupMonitor() {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            document.getElementById('localVideoMonitor').srcObject = localStream;
+
+            peer.on('connection', conn => { 
+                dataConn = conn; 
+                dataConn.on('data', d => { if(d === 'TOGGLE_FLASH') localToggleFlash(); });
+            });
+
+            peer.on('call', call => {
+                // Jawab panggilan dengan menyertakan stream kamera laptop
+                call.answer(localStream);
+                call.on('stream', remoteStream => {
+                    document.getElementById('remoteVideoMonitor').srcObject = remoteStream;
+                });
+            });
+        } catch (err) {
+            alert("Gagal akses kamera: " + err);
+        }
     }
 
-    function sendCmd(cmd) { dataConn?.send(cmd); }
-
-    function takeSnapshot() {
-        const v = document.getElementById('remoteVideo');
-        const c = document.getElementById('snapCanvas');
-        if (v.videoWidth === 0) return;
-        c.width = v.videoWidth; c.height = v.videoHeight;
-        c.getContext('2d').drawImage(v, 0, 0);
-        const a = document.createElement('a');
-        a.download = `XLink-${Date.now()}.png`;
-        a.href = c.toDataURL(); a.click();
-    }
-
-    // JOIN (HP)
+    // --- LOGIKA JOIN (HP) ---
     async function startStream() {
         const tid = document.getElementById('targetId').value;
         if (!tid) return alert("Isi ID Monitor!");
 
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
-            audio: false
-        });
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
+                audio: true
+            });
 
-        document.getElementById('localVideo').srcObject = localStream;
-        nav('ui-join'); 
-        document.getElementById('setup-join').classList.add('hidden');
-        document.getElementById('active-join').classList.remove('hidden');
+            document.getElementById('localVideoJoin').srcObject = localStream;
+            nav('ui-join'); 
+            document.getElementById('setup-join').classList.add('hidden');
+            document.getElementById('active-join').classList.remove('hidden');
 
-        dataConn = peer.connect(tid);
-        peer.call(tid, localStream);
-        dataConn.on('data', d => { if(d === 'TOGGLE_FLASH') localToggleFlash(); });
+            dataConn = peer.connect(tid);
+            
+            // Panggil Monitor dan kirim stream HP
+            const call = peer.call(tid, localStream);
+            
+            // Terima stream balik dari Monitor (Laptop)
+            call.on('stream', remoteStream => {
+                document.getElementById('remoteVideoJoin').srcObject = remoteStream;
+            });
+
+        } catch (err) {
+            alert("Gagal akses kamera: " + err);
+        }
     }
 
+    // --- FITUR TAMBAHAN ---
     async function switchCam() {
         facing = (facing === "user") ? "environment" : "user";
         isFlash = false;
         
         localStream.getTracks().forEach(t => t.stop());
         localStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: facing, width: 1280, height: 720 },
-            audio: false
+            video: { facingMode: facing },
+            audio: true
         });
 
-        const v = document.getElementById('localVideo');
+        const v = document.getElementById('localVideoJoin');
         v.srcObject = localStream;
         v.classList.toggle('mirrored', facing === "user");
-        document.getElementById('camStatus').innerText = `ACTIVE: ${facing === "user" ? "FRONT" : "BACK"} CAM`;
+        document.getElementById('camStatus').innerText = `LIVE: ${facing === "user" ? "FRONT" : "BACK"} CAM`;
 
-        peer.call(document.getElementById('targetId').value, localStream);
+        // Update call dengan stream baru
+        const tid = document.getElementById('targetId').value;
+        peer.call(tid, localStream);
     }
+
+    function sendCmd(cmd) { dataConn?.send(cmd); }
 
     async function localToggleFlash() {
         const track = localStream.getVideoTracks()[0];
         try {
             isFlash = !isFlash;
             await track.applyConstraints({ advanced: [{ torch: isFlash }] });
-        } catch (e) { console.log("Flash not supported"); }
+        } catch (e) { console.warn("Flash/Torch tidak didukung di perangkat ini."); }
+    }
+
+    function takeSnapshot(videoId) {
+        const v = document.getElementById(videoId);
+        const c = document.getElementById('snapCanvas');
+        if (!v || v.videoWidth === 0) return;
+        c.width = v.videoWidth; c.height = v.videoHeight;
+        c.getContext('2d').drawImage(v, 0, 0);
+        const a = document.createElement('a');
+        a.download = `XLink-Snap-${Date.now()}.png`;
+        a.href = c.toDataURL(); a.click();
     }
 </script>
 </body>
